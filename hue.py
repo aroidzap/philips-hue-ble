@@ -5,7 +5,13 @@
 #   Hue app > Settings > Voice Assistants > Google Home > Make Visible)
 # - Python library: bleak
 
-# pip install bleak
+# pip install bleak>=0.19.5
+
+# Name: bleak
+# Version: 0.19.5
+# Summary: Bluetooth Low Energy platform Agnostic Klient
+# Home-page: https://github.com/hbldh/bleak
+
 from bleak import BleakClient
 from bleak import BleakScanner
 
