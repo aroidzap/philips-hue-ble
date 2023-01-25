@@ -1,6 +1,11 @@
 # Install
-`conda create -n hue python=3.9`
-`pip install bleak`
+```
+conda create -n hue python=3.9
+pip install bleak
+```
 
 # Run
-`python hue.py`
+```
+python hue.py
+python hue.py --help
+```
