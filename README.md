@@ -16,3 +16,6 @@ python hue.py --help
 - Philips Hue White And Color Ambiance A67 (or similar)
 - Windows/Linux/MacOS with Bluetooth LE capability
 - Paired (Bluetooth) Philips Hue (Hue App > Settings > Voice Assistants > Google Home > Make Visible, then pair on PC)
+
+# TODO
+- Port to JavaScript (https://developer.chrome.com/articles/bluetooth/)
