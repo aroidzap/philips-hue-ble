@@ -18,4 +18,4 @@ python hue.py --help
 - Paired (Bluetooth) Philips Hue (Hue App > Settings > Voice Assistants > Google Home > Make Visible, then pair on PC)
 
 # Extra
-- Simple JavaScript port `hue.html`
+- JavaScript port `hue.html`

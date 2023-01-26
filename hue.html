@@ -71,10 +71,11 @@
                     return gatt_char.readValue();
                 })
                 .then(resp => {
-                    let colortemp_mireds = resp.getUint16(0)
+                    let colortemp_mireds = resp.getInt16(0, true)
                     if (colortemp_mireds == -1) {
                         return -1
                     } else {
+                        console.warn(colortemp_mireds)
                         return Number(Math.round(1e6 / colortemp_mireds))
                     }
                 })
@@ -83,10 +84,41 @@
                 await this.service.getCharacteristic(this._command(4))
                 .then(gatt_char => {
                     let colortemp_mireds = Number(Math.round(1e6 / temperature_k))
-                    let data = Uint16Array.of(Math.max(153, Math.min(colortemp_mireds, 500)))
+                    let data = Int16Array.of(Math.max(153, Math.min(colortemp_mireds, 500)))
                     return gatt_char.writeValue(data);
                 })
             }
+            async get_xy() {
+                return await this.service.getCharacteristic(this._command(5))
+                .then(gatt_char => {
+                    return gatt_char.readValue();
+                })
+                .then(resp => {
+                    const scale = 1 / Math.pow(2, 16)
+                    let x = resp.getUint16(0, true) * scale
+                    let y = resp.getUint16(2, true) * scale
+                    return { x: x, y: y }
+                })
+            }
+            async set_xy(x, y) {
+                await this.service.getCharacteristic(this._command(5))
+                .then(gatt_char => {
+                    const scale = Math.pow(2, 16)
+                    let data = Uint16Array.of(x * scale, y * scale)
+                    return gatt_char.writeValue(data);
+                })
+            }
+        }
+
+        // https://codeandlife.com/2022/03/20/control-philips-hue-color-rgb-lights-with-python/
+        function rgb2xyb(r, g, b) {
+            if (r > 0.04045) { r = ((r + 0.055) / 1.055)**2.4 } else { r = r / 12.92 }
+            if (g > 0.04045) { g = ((g + 0.055) / 1.055)**2.4 } else { g = g / 12.92 }
+            if (b > 0.04045) { b = ((b + 0.055) / 1.055)**2.4 } else { b = b / 12.92 }
+            let X = r * 0.4124 + g * 0.3576 + b * 0.1805
+            let Y = r * 0.2126 + g * 0.7152 + b * 0.0722
+            let Z = r * 0.0193 + g * 0.1192 + b * 0.9505
+            return {x: X / (X + Y + Z), y: Y / (X + Y + Z), b: Y}
         }
     </script>
 </head>
@@ -94,6 +126,7 @@
 <body>
     <p><button id="pair_button">Pair</button></p>
     <p><button id="toggle_button">Toggle</button></p>
+    <p><button id="random_button">Random Color</button></p>
     <p>Brightness: <input id="brightness_slider" type="range" min="0" max="1" step="0.001"></p>
     <p>Color Temperature: <input id="tmep_k_slider" type="range" min="2000" max="6500" step="100"></p>
     <script>
@@ -112,11 +145,21 @@
         }
         toggle_button.addEventListener('click', toggle_handler);
 
+        let random_button = document.getElementById('random_button')
+        async function random_handler(e) {
+            let xyb = rgb2xyb(Math.random(), Math.random(), Math.random())
+            await hue.set_xy(xyb.x, xyb.y)
+            console.log(await hue.get_xy())
+            await hue.set_brightness(xyb.b)
+            console.log(await hue.get_brightness())
+        }
+        random_button.addEventListener('click', random_handler);
+
         let brightness_slider = document.getElementById('brightness_slider')
         async function brightness_handler(e) {
             console.log(this.value)
             await hue.set_brightness(this.value)
-            console.log(await hue.set_brightness())
+            console.log(await hue.get_brightness())
         }
         brightness_slider.addEventListener('input', brightness_handler);
         brightness_slider.addEventListener('change', brightness_handler);
