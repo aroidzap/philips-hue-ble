@@ -46,7 +46,7 @@
                 await this.service.getCharacteristic(this._command(2))
                 .then(gatt_char => {
                     let data = Uint8Array.of(Number(enabled));
-                    return gatt_char.writeValue(data);
+                    return gatt_char.writeValueWithResponse(data);
                 })
             }
             async get_brightness() {
@@ -62,7 +62,7 @@
                 await this.service.getCharacteristic(this._command(3))
                 .then(gatt_char => {
                     let data = Uint8Array.of(Math.max(1, Math.min(Number(Math.round(ratio * 254)), 254)));
-                    return gatt_char.writeValue(data);
+                    return gatt_char.writeValueWithResponse(data);
                 })
             }
             async get_temperature_k() {
@@ -85,7 +85,7 @@
                 .then(gatt_char => {
                     let colortemp_mireds = Number(Math.round(1e6 / temperature_k))
                     let data = Int16Array.of(Math.max(153, Math.min(colortemp_mireds, 500)))
-                    return gatt_char.writeValue(data);
+                    return gatt_char.writeValueWithResponse(data);
                 })
             }
             async get_xy() {
@@ -113,7 +113,7 @@
                     // # TODO: Check CIE 1931 range to avoid out of range error
                     const scale = Math.pow(2, 16)
                     let data = Uint16Array.of(x * scale, y * scale)
-                    return gatt_char.writeValue(data);
+                    return gatt_char.writeValueWithResponse(data);
                 })
             }
         }
