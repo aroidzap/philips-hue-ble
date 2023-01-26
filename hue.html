@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang=en>
+
+<head>
+    <meta charset=utf-8>
+    <title>Philips Hue BLE</title>
+
+    <script>
+        // https://developer.chrome.com/articles/bluetooth/
+        class PhilipsHueClient {
+            SERVICE_UUID() { return '0000fe0f-0000-1000-8000-00805f9b34fb' }
+            _command(code) {
+                return '932c32bd-' + String(code).padStart(4, '0') + '-47a2-835a-a8d455b859dd'
+            }
+            async request() {
+                navigator.bluetooth.requestDevice({
+                    filters: [{
+                        services: [this.SERVICE_UUID()]
+                    }],
+                    optionalServices: [this._command(0)]
+                })
+                .then(device => { 
+                    console.log(device) 
+                    return device.gatt.connect();
+                })
+                .then(server => {
+                    return server.getPrimaryService(this._command(0));
+                })
+                .then(service => {
+                    this.service = service;
+                })
+                .catch(error => { 
+                    console.error(error); 
+                });
+            }
+            async get_power() {
+                return await this.service.getCharacteristic(this._command(2))
+                .then(gatt_char => {
+                    return gatt_char.readValue();
+                })
+                .then(resp => {
+                    return Boolean(resp.getUint8(0));
+                })
+            }
+            async set_power(enabled) {
+                await this.service.getCharacteristic(this._command(2))
+                .then(gatt_char => {
+                    let data = Uint8Array.of(Number(enabled));
+                    return gatt_char.writeValue(data);
+                })
+            }
+            async get_brightness() {
+                return await this.service.getCharacteristic(this._command(3))
+                .then(gatt_char => {
+                    return gatt_char.readValue();
+                })
+                .then(resp => {
+                    return resp.getUint8(0) / 254;
+                })
+            }
+            async set_brightness(ratio) {
+                await this.service.getCharacteristic(this._command(3))
+                .then(gatt_char => {
+                    let data = Uint8Array.of(Math.max(1, Math.min(Number(Math.round(ratio * 254)), 254)));
+                    return gatt_char.writeValue(data);
+                })
+            }
+            async get_temperature_k() {
+                return await this.service.getCharacteristic(this._command(4))
+                .then(gatt_char => {
+                    return gatt_char.readValue();
+                })
+                .then(resp => {
+                    let colortemp_mireds = resp.getUint16(0)
+                    if (colortemp_mireds == -1) {
+                        return -1
+                    } else {
+                        return Number(Math.round(1e6 / colortemp_mireds))
+                    }
+                })
+            }
+            async set_temperature_k(temperature_k) {
+                await this.service.getCharacteristic(this._command(4))
+                .then(gatt_char => {
+                    let colortemp_mireds = Number(Math.round(1e6 / temperature_k))
+                    let data = Uint16Array.of(Math.max(153, Math.min(colortemp_mireds, 500)))
+                    return gatt_char.writeValue(data);
+                })
+            }
+        }
+    </script>
+</head>
+
+<body>
+    <p><button id="pair_button">Pair</button></p>
+    <p><button id="toggle_button">Toggle</button></p>
+    <p>Brightness: <input id="brightness_slider" type="range" min="0" max="1" step="0.001"></p>
+    <p>Color Temperature: <input id="tmep_k_slider" type="range" min="2000" max="6500" step="100"></p>
+    <script>
+        let hue = new PhilipsHueClient()
+
+        let pair_button = document.getElementById('pair_button')
+        pair_button.addEventListener('click', async function (e) {
+            await hue.request()
+        });
+
+        let toggle_button = document.getElementById('toggle_button')
+        async function toggle_handler(e) {
+            let light_on = await hue.get_power()
+            console.log(light_on)
+            hue.set_power(!light_on)
+        }
+        toggle_button.addEventListener('click', toggle_handler);
+
+        let brightness_slider = document.getElementById('brightness_slider')
+        async function brightness_handler(e) {
+            console.log(this.value)
+            await hue.set_brightness(this.value)
+            console.log(await hue.set_brightness())
+        }
+        brightness_slider.addEventListener('input', brightness_handler);
+        brightness_slider.addEventListener('change', brightness_handler);
+
+        let tmep_k_slider = document.getElementById('tmep_k_slider')
+        async function tmep_k_handler(e) {
+            console.log(this.value)
+            await hue.set_temperature_k(this.value)
+            console.log(await hue.get_temperature_k())
+        }
+        tmep_k_slider.addEventListener('input', tmep_k_handler);
+        tmep_k_slider.addEventListener('change', tmep_k_handler);
+    </script>
+</body>
+
+</html>
