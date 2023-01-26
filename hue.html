@@ -132,7 +132,7 @@
             var x = X / (X + Y + Z);
             var y = Y / (X + Y + Z);
             var brightness = Y;
-            return {x, y, brightness};
+            return {x: x, y: y, b: brightness};
         }
         function cieToRgb(x, y, brightness) {
             // Convert back to XYZ color space
