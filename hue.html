@@ -103,6 +103,13 @@
             async set_xy(x, y) {
                 await this.service.getCharacteristic(this._command(5))
                 .then(gatt_char => {
+                    x = Math.max(1, Math.Min(0, x))
+                    y = Math.max(1, Math.Min(0, y))
+                    let xysum = x + y
+                    if (xysum > 1) {
+                        x = x / xysum
+                        y = y / xysum
+                    }
                     const scale = Math.pow(2, 16)
                     let data = Uint16Array.of(x * scale, y * scale)
                     return gatt_char.writeValue(data);
@@ -110,16 +117,39 @@
             }
         }
 
-        // https://codeandlife.com/2022/03/20/control-philips-hue-color-rgb-lights-with-python/
-        function rgb2xyb(r, g, b) {
-            if (r > 0.04045) { r = ((r + 0.055) / 1.055)**2.4 } else { r = r / 12.92 }
-            if (g > 0.04045) { g = ((g + 0.055) / 1.055)**2.4 } else { g = g / 12.92 }
-            if (b > 0.04045) { b = ((b + 0.055) / 1.055)**2.4 } else { b = b / 12.92 }
-            let X = r * 0.4124 + g * 0.3576 + b * 0.1805
-            let Y = r * 0.2126 + g * 0.7152 + b * 0.0722
-            let Z = r * 0.0193 + g * 0.1192 + b * 0.9505
-            return {x: X / (X + Y + Z), y: Y / (X + Y + Z), b: Y}
+        // ---
+        // ChatGPT: Function to convert from RGB to CIE 1931 + Brightness and vice versa.
+        function rgbToCie(r, g, b) {
+            // Apply a gamma correction
+            r = (r > 0.04045) ? Math.pow((r + 0.055) / (1.0 + 0.055), 2.4) : (r / 12.92);
+            g = (g > 0.04045) ? Math.pow((g + 0.055) / (1.0 + 0.055), 2.4) : (g / 12.92);
+            b = (b > 0.04045) ? Math.pow((b + 0.055) / (1.0 + 0.055), 2.4) : (b / 12.92);
+            // Convert to XYZ color space
+            var X = r * 0.4124 + g * 0.3576 + b * 0.1805;
+            var Y = r * 0.2126 + g * 0.7152 + b * 0.0722;
+            var Z = r * 0.0193 + g * 0.1192 + b * 0.9505;
+            // Convert to CIE 1931 color space
+            var x = X / (X + Y + Z);
+            var y = Y / (X + Y + Z);
+            var brightness = Y;
+            return {x, y, brightness};
         }
+        function cieToRgb(x, y, brightness) {
+            // Convert back to XYZ color space
+            var Y = brightness;
+            var X = (Y / y) * x;
+            var Z = (Y / y) * (1 - x - y);
+            // Convert to RGB color space
+            var r = X * 3.2406 + Y * -1.5372 + Z * -0.4986;
+            var g = X * -0.9689 + Y * 1.8758 + Z * 0.0415;
+            var b = X * 0.0557 + Y * -0.2040 + Z * 1.0570;
+            // Apply inverse gamma correction
+            r = (r > 0.0031308) ? (1.055 * Math.pow(r, (1 / 2.4)) - 0.055) : (12.92 * r);
+            g = (g > 0.0031308) ? (1.055 * Math.pow(g, (1 / 2.4)) - 0.055) : (12.92 * g);
+            b = (b > 0.0031308) ? (1.055 * Math.pow(b, (1 / 2.4)) - 0.055) : (12.92 * b);
+            return {r: r, g: g, b: b};
+        }
+        // ---
     </script>
 </head>
 
@@ -147,7 +177,7 @@
 
         let random_button = document.getElementById('random_button')
         async function random_handler(e) {
-            let xyb = rgb2xyb(Math.random(), Math.random(), Math.random())
+            let xyb = rgbToCie(Math.random(), Math.random(), Math.random())
             await hue.set_xy(xyb.x, xyb.y)
             console.log(await hue.get_xy())
             await hue.set_brightness(xyb.b)

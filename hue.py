@@ -95,20 +95,48 @@ class PhilipsHueClient(BleakClient):
         :param xy: XY coordinate
         :type xy: Tuple[float,float]
         """
-        # TODO: check range to avoid out of range error
+        x = max(1, min(0, x))
+        y = max(1, min(0, y))
+        xysum = x + y
+        if xysum > 1:
+            x = x / xysum
+            y = y / xysum
         scale = 2**16
         data = struct.pack('HH', *[int(round(scale * val)) for val in (x, y)])
         return await self.write_gatt_char(PhilipsHueClient._command(5), data, response=True)
 
-# https://codeandlife.com/2022/03/20/control-philips-hue-color-rgb-lights-with-python/
-def rgb2xyb(r, g, b):
-    r = ((r + 0.055) / 1.055)**2.4 if r > 0.04045 else r / 12.92
-    g = ((g + 0.055) / 1.055)**2.4 if g > 0.04045 else g / 12.92
-    b = ((b + 0.055) / 1.055)**2.4 if b > 0.04045 else b / 12.92
+####
+# ChatGPT: Function to convert from RGB to CIE 1931 + Brightness and vice versa.
+def rgb_to_cie(r, g, b):
+    # Apply a gamma correction
+    r = pow((r + 0.055) / (1.0 + 0.055), 2.4) if (r > 0.04045) else (r / 12.92)
+    g = pow((g + 0.055) / (1.0 + 0.055), 2.4) if (g > 0.04045) else (g / 12.92)
+    b = pow((b + 0.055) / (1.0 + 0.055), 2.4) if (b > 0.04045) else (b / 12.92)
+    # Convert to XYZ color space
     X = r * 0.4124 + g * 0.3576 + b * 0.1805
     Y = r * 0.2126 + g * 0.7152 + b * 0.0722
     Z = r * 0.0193 + g * 0.1192 + b * 0.9505
-    return X / (X + Y + Z), Y / (X + Y + Z), Y
+    # Convert to CIE 1931 color space
+    x = X / (X + Y + Z)
+    y = Y / (X + Y + Z)
+    brightness = Y
+    return (x, y, brightness)
+
+def cie_to_rgb(x, y, brightness):
+    # Convert back to XYZ color space
+    Y = brightness
+    X = (Y / y) * x
+    Z = (Y / y) * (1 - x - y)
+    # Convert to RGB color space
+    r = X * 3.2406 + Y * -1.5372 + Z * -0.4986
+    g = X * -0.9689 + Y * 1.8758 + Z * 0.0415
+    b = X * 0.0557 + Y * -0.2040 + Z * 1.0570
+    # Apply inverse gamma correction
+    r = (1.055 * pow(r, (1 / 2.4)) - 0.055) if (r > 0.0031308) else (12.92 * r)
+    g = (1.055 * pow(g, (1 / 2.4)) - 0.055) if (g > 0.0031308) else (12.92 * g)
+    b = (1.055 * pow(b, (1 / 2.4)) - 0.055) if (b > 0.0031308) else (12.92 * b)
+    return (r, g, b)
+####
 
 async def main(address = None):
     if address is None:
@@ -153,7 +181,7 @@ async def main(address = None):
         if False:
             import random
             while True:
-                x,y,b = rgb2xyb(random.random(), random.random(), random.random())
+                x,y,b = rgb_to_cie(random.random(), random.random(), random.random())
                 await hue.set_xy(x, y)
                 await hue.set_brightness(b)
                 await asyncio.sleep(0.1)
