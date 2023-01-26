@@ -95,12 +95,13 @@ class PhilipsHueClient(BleakClient):
         :param xy: XY coordinate
         :type xy: Tuple[float,float]
         """
-        x = max(1, min(0, x))
-        y = max(1, min(0, y))
+        x = min(1, max(0, x))
+        y = min(1, max(0, y))
         xysum = x + y
         if xysum > 1:
             x = x / xysum
             y = y / xysum
+        # TODO: Check CIE 1931 range to avoid out of range error
         scale = 2**16
         data = struct.pack('HH', *[int(round(scale * val)) for val in (x, y)])
         return await self.write_gatt_char(PhilipsHueClient._command(5), data, response=True)
@@ -181,9 +182,14 @@ async def main(address = None):
         if False:
             import random
             while True:
-                x,y,b = rgb_to_cie(random.random(), random.random(), random.random())
+                r,g,b = random.random(), random.random(), random.random()
+                x,y,bri = rgb_to_cie(r, g, b)
+
+                # override brightness
+                bri = max(r, max(g, b))
+
                 await hue.set_xy(x, y)
-                await hue.set_brightness(b)
+                await hue.set_brightness(bri)
                 await asyncio.sleep(0.1)
 
 if __name__ == "__main__":

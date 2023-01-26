@@ -103,13 +103,14 @@
             async set_xy(x, y) {
                 await this.service.getCharacteristic(this._command(5))
                 .then(gatt_char => {
-                    x = Math.max(1, Math.Min(0, x))
-                    y = Math.max(1, Math.Min(0, y))
+                    x = Math.min(1, Math.max(0, x))
+                    y = Math.min(1, Math.max(0, y))
                     let xysum = x + y
                     if (xysum > 1) {
                         x = x / xysum
                         y = y / xysum
                     }
+                    // # TODO: Check CIE 1931 range to avoid out of range error
                     const scale = Math.pow(2, 16)
                     let data = Uint16Array.of(x * scale, y * scale)
                     return gatt_char.writeValue(data);
@@ -156,7 +157,7 @@
 <body>
     <p><button id="pair_button">Pair</button></p>
     <p><button id="toggle_button">Toggle</button></p>
-    <p><button id="random_button">Random Color</button></p>
+    <p><input type="color" id="color_picker" value="#000000"></p>
     <p>Brightness: <input id="brightness_slider" type="range" min="0" max="1" step="0.001"></p>
     <p>Color Temperature: <input id="tmep_k_slider" type="range" min="2000" max="6500" step="100"></p>
     <script>
@@ -175,15 +176,24 @@
         }
         toggle_button.addEventListener('click', toggle_handler);
 
-        let random_button = document.getElementById('random_button')
-        async function random_handler(e) {
-            let xyb = rgbToCie(Math.random(), Math.random(), Math.random())
+        let color_picker = document.getElementById('color_picker')
+        async function color_handler(e) {
+            rgb = parseInt(this.value.substring(1), 16)
+            r = ((rgb >> 16) & 0xff) / 255
+            g = ((rgb >> 8) & 0xff) / 255
+            b = ((rgb >> 0) & 0xff) / 255
+
+            let xyb = rgbToCie(r,g,b)
+            // override brightness
+            xyb.b = Math.max(r, Math.max(g, b))
+
             await hue.set_xy(xyb.x, xyb.y)
             console.log(await hue.get_xy())
             await hue.set_brightness(xyb.b)
             console.log(await hue.get_brightness())
         }
-        random_button.addEventListener('click', random_handler);
+        color_picker.addEventListener('input', color_handler);
+        color_picker.addEventListener('change', color_handler);
 
         let brightness_slider = document.getElementById('brightness_slider')
         async function brightness_handler(e) {
